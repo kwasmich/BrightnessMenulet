@@ -220,9 +220,7 @@ bool DDCRead(CGDirectDisplayID displayID, struct DDCReadCommand *read) {
         request.replyBytes = sizeof(reply_data);
         
         result = DisplayRequest(displayID, &request);
-        result = result && reply_data[0] == request.sendAddress;
-        // DELL U2713H sends garbage
-//        result = (result && reply_data[0] == request.sendAddress && reply_data[2] == 0x2 && reply_data[4] == read->control_id && reply_data[10] == (request.replyAddress ^ request.replySubAddress ^ reply_data[1] ^ reply_data[2] ^ reply_data[3] ^ reply_data[4] ^ reply_data[5] ^ reply_data[6] ^ reply_data[7] ^ reply_data[8] ^ reply_data[9]));
+        result = (result && reply_data[0] == request.sendAddress && reply_data[2] == 0x2 && reply_data[4] == read->control_id && reply_data[10] == (request.replyAddress ^ request.replySubAddress ^ reply_data[1] ^ reply_data[2] ^ reply_data[3] ^ reply_data[4] ^ reply_data[5] ^ reply_data[6] ^ reply_data[7] ^ reply_data[8] ^ reply_data[9]));
 
         if (result) { // checksum is ok
             if (i > 1) {
@@ -236,9 +234,18 @@ bool DDCRead(CGDirectDisplayID displayID, struct DDCReadCommand *read) {
         
         // reset values and return 0, if data reading fails
         if (i >= kMaxRequests) {
-            read->success = false;
-            read->max_value = 0;
-            read->current_value = 0;
+            // DELL U2713H sends garbage - use this as fallback
+            read->success = true;
+            read->max_value = 100;
+
+            if (read->control_id == BRIGHTNESS) {
+                read->current_value = 20;
+            }
+
+            if (read->control_id == CONTRAST) {
+                read->current_value = 50;
+            }
+
             printf("E: No data after %d tries! \n", i);
             return 0;
         }
@@ -246,8 +253,8 @@ bool DDCRead(CGDirectDisplayID displayID, struct DDCReadCommand *read) {
         usleep(40000); // 40msec -> See DDC/CI Vesa Standard - 4.4.1 Communication Error Recovery
     }
     read->success = true;
-    read->max_value = 100;
-    read->current_value = 20;
+    read->max_value = reply_data[7];
+    read->current_value = reply_data[9];
     return result;
 }
 
